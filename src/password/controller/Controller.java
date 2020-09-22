@@ -241,6 +241,8 @@ public class Controller {
 
                 enableInput();
 
+                System.gc();
+
                 scheduledExecutorService.shutdown();
 
             }
