@@ -1,0 +1,410 @@
+package password.controller;
+
+import javafx.application.Platform;
+import javafx.fxml.FXML;
+
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
+
+import javafx.scene.paint.Color;
+
+import java.security.SecureRandom;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class Controller {
+
+    @FXML
+    private Button generateButton;
+
+    @FXML
+    private Label lengthLabel;
+
+    @FXML
+    private Label passwordStrengthLabel;
+
+    @FXML
+    private ListView<String> passwordListView;
+
+    @FXML
+    private ProgressIndicator progressIndicator;
+
+    @FXML
+    private RadioButton symbolRadioButton;
+
+    @FXML
+    private RadioButton numberRadioButton;
+
+    @FXML
+    private RadioButton lowercaseRadioButton;
+
+    @FXML
+    private RadioButton uppercaseRadioButton;
+
+    @FXML
+    private TextField numberOfPasswordsTextField;
+
+    @FXML
+    private TextField lengthTextField;
+
+    private final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    private boolean useNumbers;
+    private boolean useSymbols;
+    private boolean useLowercase;
+    private boolean useUppercase;
+
+    private int length;
+    private int minLength;
+    private int maxLength;
+    private int numberOfPasswords;
+
+    @FXML
+    private void initialize(){
+
+        passwordListView.setCellFactory(param -> new CustomListCell());
+
+        lengthTextField.textProperty().addListener(((observable, oldValue, newValue) -> {
+
+            if (!newValue.matches("\\d{0,9}"))
+                lengthTextField.setText(oldValue);
+
+            updateValues();
+
+        }));
+
+        lengthTextField.setOnKeyPressed(event -> {
+
+            if (event.getCode() == KeyCode.ENTER)
+                generatePassword();
+
+        });
+
+        numberOfPasswordsTextField.textProperty().addListener(((observable, oldValue, newValue) -> {
+
+            if (!newValue.matches("\\d{0,9}"))
+                numberOfPasswordsTextField.setText(oldValue);
+
+            updateValues();
+
+        }));
+
+        numberOfPasswordsTextField.setOnKeyPressed(event -> {
+
+            if (event.getCode() == KeyCode.ENTER)
+                generatePassword();
+
+        });
+
+        updateValues();
+
+    }
+
+    @FXML
+    private void updateValues(){
+
+        minLength = 0;
+        maxLength = 0;
+
+        useNumbers = numberRadioButton.isSelected();
+        useSymbols = symbolRadioButton.isSelected();
+        useLowercase = lowercaseRadioButton.isSelected();
+        useUppercase = uppercaseRadioButton.isSelected();
+
+        length = getIntegerTextFieldValue(lengthTextField);
+        numberOfPasswords = getIntegerTextFieldValue(numberOfPasswordsTextField);
+
+        double colorValue = 100;
+        double strength = 0;
+
+        if(useNumbers){
+
+            minLength++;
+            maxLength += 10;
+            colorValue -= 20;
+            strength += 20;
+
+        }
+
+        if(useSymbols){
+
+            minLength++;
+            maxLength += 30;
+            colorValue -= 20;
+            strength += 20;
+
+        }
+
+        if(useLowercase){
+
+            minLength++;
+            maxLength += 26;
+            colorValue -= 20;
+            strength += 20;
+
+        }
+
+        if(useUppercase){
+
+            minLength++;
+            maxLength += 26;
+            colorValue -= 20;
+            strength += 20;
+
+        }
+
+        if(length >= 8){
+
+            colorValue -= 20;
+            strength += 20;
+
+        }
+
+        generateButton.setDisable(isInputInvalid());
+
+        lengthLabel.setText("- " + (minLength == 0 ? "..." : minLength)+ " < length <= " + (maxLength == 0 ? "..." : maxLength));
+
+        passwordStrengthLabel.setText(strength + "%");
+        passwordStrengthLabel.setTextFill(new Color((255 * colorValue) / 25500, (255 * (100 - colorValue)) / 25500, 0, 1));
+
+    }
+
+    @FXML
+    private void generatePassword(){
+
+        if(isInputInvalid())
+            return;
+
+        final AtomicInteger NUMBER_OF_PASSWORDS = new AtomicInteger(numberOfPasswords);
+
+        final Integer[] ASCII_VALUES = getSelectedASCIIValues(useNumbers, useSymbols, useLowercase, useUppercase);
+
+        AtomicInteger totalPasswords = new AtomicInteger(0);
+
+        disableInput();
+
+        passwordListView.getItems().clear();
+
+        ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(3);
+
+        scheduledExecutorService.scheduleAtFixedRate(() -> {
+
+            StringBuilder password;
+
+            //Validating password
+            do{
+
+                List<Integer> asciiValuesCopy = new ArrayList<>(Arrays.asList(ASCII_VALUES));
+
+                password = new StringBuilder();
+
+                //Generating password.
+                for(int j = 0; j < length; j++){
+
+                    int index = SECURE_RANDOM.nextInt(asciiValuesCopy.size());
+                    int asciiValue = asciiValuesCopy.get(index);
+
+                    password.append((char) asciiValue);
+
+                    asciiValuesCopy.remove(index);
+
+                }
+
+            }while(isPasswordInvalid(password.toString(), useNumbers, useSymbols, useLowercase, useUppercase));
+
+            StringBuilder finalPassword = password;
+            Platform.runLater(() -> passwordListView.getItems().add(finalPassword.toString()));
+
+            totalPasswords.getAndIncrement();
+
+            progressIndicator.setProgress(totalPasswords.doubleValue() / numberOfPasswords);
+
+            if(totalPasswords.intValue() == NUMBER_OF_PASSWORDS.intValue()){
+
+                progressIndicator.setProgress(1);
+
+                scheduledExecutorService.schedule(() -> progressIndicator.setProgress(0), 1, TimeUnit.MILLISECONDS);
+
+                passwordListView.refresh();
+
+                enableInput();
+
+                scheduledExecutorService.shutdown();
+
+            }
+
+        }, 0, 1, TimeUnit.MILLISECONDS);
+
+    }
+
+    private boolean isInputInvalid(){
+
+        return length == 0 || length < minLength || length > maxLength || numberOfPasswords == 0
+                || numberOfPasswords > 1000 || (!useNumbers && !useSymbols && !useLowercase && !useUppercase);
+
+    }
+
+    private boolean isPasswordInvalid(String password, boolean numbers, boolean symbols, boolean lowercase, boolean uppercase){
+
+        boolean hasNumbers = false;
+        boolean hasSymbols = false;
+        boolean hasLowercase = false;
+        boolean hasUppercase= false;
+
+        //Check numbers
+        for(int i = 0; i < password.length(); i++){
+
+            int charValue = password.charAt(i);
+
+            hasNumbers = charValue > 47 && charValue < 58;
+
+            if(hasNumbers)
+                break;
+
+        }
+
+        //Check symbols
+        for(int i = 0; i < password.length(); i++){
+
+            int charValue = password.charAt(i);
+
+            hasSymbols = (charValue > 32 && charValue < 48) ||
+                    (charValue > 57 && charValue < 65) ||
+                    (charValue > 90 && charValue < 97) ||
+                    (charValue > 122 && charValue < 127);
+
+            if(hasSymbols)
+                break;
+
+        }
+
+        //Check lowercase
+        for(int i = 0; i < password.length(); i++){
+
+            int charValue = password.charAt(i);
+
+            hasLowercase = charValue > 96 && charValue < 123;
+
+            if(hasLowercase)
+                break;
+
+        }
+
+        //Check uppercase
+        for(int i = 0; i < password.length(); i++){
+
+            int charValue = password.charAt(i);
+
+            hasUppercase = charValue > 64 && charValue < 91;
+
+            if(hasUppercase)
+                break;
+
+        }
+
+        return hasNumbers != numbers || hasSymbols != symbols || hasLowercase != lowercase || hasUppercase != uppercase;
+
+    }
+
+    private int getIntegerTextFieldValue(TextField textField){
+
+        String text = textField.getText();
+
+        if(text == null || text.isEmpty())
+            return 0;
+
+        return Integer.parseInt(text);
+
+    }
+
+    private Integer[] getSelectedASCIIValues(boolean numbers, boolean symbols, boolean lowercase, boolean uppercase){
+
+        final Integer[] NUMBERS = new Integer[]{ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57 };
+        final Integer[] SYMBOLS = new Integer[]{ 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 58, 59, 61,
+                63, 64, 91, 92, 93, 94, 95, 96, 123, 124, 125, 126 };
+        final Integer[] LOWERCASE = new Integer[]{ 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
+                113, 114, 115, 116, 117, 118, 119, 120, 121, 122 };
+        final Integer[] UPPERCASE = new Integer[]{ 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83,
+                84, 85, 86, 87, 88, 89, 90 };
+
+        List<Integer> asciiValues = new ArrayList<>();
+
+        if(numbers)
+            asciiValues.addAll(Arrays.asList(NUMBERS));
+
+        if(symbols)
+            asciiValues.addAll(Arrays.asList(SYMBOLS));
+
+        if(lowercase)
+            asciiValues.addAll(Arrays.asList(LOWERCASE));
+
+        if(uppercase)
+            asciiValues.addAll(Arrays.asList(UPPERCASE));
+
+        return asciiValues.toArray(new Integer[0]);
+
+    }
+
+    private void disableInput(){
+
+        progressIndicator.setVisible(true);
+        numberOfPasswordsTextField.setDisable(true);
+        lengthTextField.setDisable(true);
+        numberRadioButton.setDisable(true);
+        symbolRadioButton.setDisable(true);
+        lowercaseRadioButton.setDisable(true);
+        uppercaseRadioButton.setDisable(true);
+        generateButton.setDisable(true);
+
+    }
+
+    private void enableInput(){
+
+        progressIndicator.setVisible(false);
+        numberOfPasswordsTextField.setDisable(false);
+        lengthTextField.setDisable(false);
+        numberRadioButton.setDisable(false);
+        symbolRadioButton.setDisable(false);
+        lowercaseRadioButton.setDisable(false);
+        uppercaseRadioButton.setDisable(false);
+        generateButton.setDisable(false);
+
+    }
+
+    private static class CustomListCell extends ListCell<String> {
+
+        @Override
+        protected void updateItem(String item, boolean empty){
+
+            super.updateItem(item, empty);
+
+            if (empty || item == null) {
+
+                setGraphic(null);
+
+            } else {
+
+                TextField textField = new TextField(item);
+                textField.setEditable(false);
+
+                setGraphic(textField);
+
+            }
+
+        }
+
+    }
+
+}
