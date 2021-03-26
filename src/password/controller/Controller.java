@@ -76,6 +76,8 @@ public class Controller {
 
         passwordListView.setCellFactory(param -> new CustomListCell());
 
+        lengthTextField.setText(Integer.toString(12));
+
         lengthTextField.textProperty().addListener(((observable, oldValue, newValue) -> {
 
             if (!newValue.matches("\\d{0,9}"))
@@ -92,6 +94,8 @@ public class Controller {
 
         });
 
+        numberOfPasswordsTextField.setText(Integer.toString(1));
+
         numberOfPasswordsTextField.textProperty().addListener(((observable, oldValue, newValue) -> {
 
             if (!newValue.matches("\\d{0,9}"))
@@ -107,6 +111,11 @@ public class Controller {
                 generatePassword();
 
         });
+
+        symbolRadioButton.setSelected(true);
+        numberRadioButton.setSelected(true);
+        lowercaseRadioButton.setSelected(true);
+        uppercaseRadioButton.setSelected(true);
 
         updateValues();
 
@@ -165,7 +174,7 @@ public class Controller {
 
         }
 
-        if(length >= 8){
+        if(length >= 12){
 
             colorValue -= 20;
             strength += 20;
