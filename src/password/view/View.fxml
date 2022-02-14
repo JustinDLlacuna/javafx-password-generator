@@ -76,6 +76,7 @@
          </HBox>
          <Button fx:id="generateButton" disable="true" mnemonicParsing="false" onAction="#generatePassword" text="Generate" />
          <ProgressBar fx:id="progressIndicator" maxWidth="1.7976931348623157E308" progress="0.0" visible="false" />
+         <Label text="v1.1.2" textFill="#00000080" />
       </VBox>
    </VBox>
 </GridPane>
