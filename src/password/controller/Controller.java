@@ -25,6 +25,7 @@ import java.security.SecureRandom;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -40,6 +41,9 @@ public class Controller {
 
     @FXML
     private Label passwordStrengthLabel;
+
+    @FXML
+    private Label passwordCountLabel;
 
     @FXML
     private Label toastLabel;
@@ -71,6 +75,12 @@ public class Controller {
     @FXML
     private StackPane toast;
 
+    private final int TOTAL_NUMBERS = 10;
+    private final int TOTAL_SYMBOLS = 30;
+    private final int TOTAL_LETTERS = 26;
+    private final int MAX_GENERATED_PASSWORDS = 100;
+    private final int DEFAULT_LENGTH = 12;
+
     private final DecimalFormat TO_HUND = new DecimalFormat("#.##");
     private final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -83,12 +93,17 @@ public class Controller {
     private int minLength;
     private int maxLength;
     private int numberOfPasswords;
+    private int maxCombosPerLetter;
+    private int maxPasswordsCombos;
+
+    private double colorValue;
+    private double strength;
 
     @FXML
     private void initialize() {
         passwordListView.setCellFactory(param -> new CustomListCell());
 
-        lengthTextField.setText(Integer.toString(12));
+        lengthTextField.setText(Integer.toString(DEFAULT_LENGTH));
 
         lengthTextField.textProperty().addListener(((observable, oldValue, newValue) -> {
             if (!newValue.matches("\\d{0,9}"))
@@ -133,6 +148,8 @@ public class Controller {
     private void updateValues() {
         minLength = 0;
         maxLength = 0;
+        maxPasswordsCombos = 0;
+        maxCombosPerLetter = 0;
 
         useNumbers = numberRadioButton.isSelected();
         useSymbols = symbolRadioButton.isSelected();
@@ -142,49 +159,19 @@ public class Controller {
         length = getIntegerTextFieldValue(lengthTextField);
         numberOfPasswords = getIntegerTextFieldValue(numberOfPasswordsTextField);
 
+        colorValue = 100.0;
+        strength = 0;
+
         boolean didInputLengths = length > 0 && numberOfPasswords > 0;
 
-        double colorValue = 100.0;
-        double strength = 0;
+        updateValuesDriver(useNumbers, TOTAL_NUMBERS, didInputLengths);
+        updateValuesDriver(useSymbols, TOTAL_SYMBOLS, didInputLengths);
+        updateValuesDriver(useLowercase, TOTAL_LETTERS, didInputLengths);
+        updateValuesDriver(useUppercase, TOTAL_LETTERS, didInputLengths);
 
-        if(useNumbers) {
-            minLength++;
-            maxLength += 10;
-
-            if (didInputLengths) {
-                colorValue -= 20;
-                strength += 20;
-            }
-        }
-
-        if(useSymbols) {
-            minLength++;
-            maxLength += 30;
-
-            if (didInputLengths) {
-                colorValue -= 20;
-                strength += 20;
-            }
-        }
-
-        if(useLowercase) {
-            minLength++;
-            maxLength += 26;
-
-            if (didInputLengths) {
-                colorValue -= 20;
-                strength += 20;
-            }
-        }
-
-        if(useUppercase) {
-            minLength++;
-            maxLength += 26;
-
-            if (didInputLengths) {
-                colorValue -= 20;
-                strength += 20;
-            }
+        maxPasswordsCombos = (int)Math.pow(maxCombosPerLetter, length);
+        if (maxPasswordsCombos > MAX_GENERATED_PASSWORDS) {
+            maxPasswordsCombos = MAX_GENERATED_PASSWORDS;
         }
 
         //Length
@@ -199,7 +186,8 @@ public class Controller {
 
         generateButton.setDisable(isInputInvalid());
 
-        lengthLabel.setText("- " + (minLength == 0 ? "..." : minLength)+ " < length <= " + (maxLength == 0 ? "..." : maxLength));
+        lengthLabel.setText("- " + (minLength == 0 ? "..." : minLength) + " < length <= " + (maxLength == 0 ? "..." : maxLength));
+        passwordCountLabel.setText("- 0 < number of passwords <= " + (maxPasswordsCombos == 0  ? "..." : maxPasswordsCombos));
 
         passwordStrengthLabel.setText(TO_HUND.format(strength) + "%");
         passwordStrengthLabel.setTextFill(new Color((255 * colorValue) / 25500, (255 * (100 - colorValue)) / 25500, 0, 1));
@@ -213,6 +201,8 @@ public class Controller {
         final AtomicInteger NUMBER_OF_PASSWORDS = new AtomicInteger(numberOfPasswords);
         final Integer[] ASCII_VALUES = getSelectedASCIIValues(useNumbers, useSymbols, useLowercase, useUppercase);
         AtomicInteger totalPasswords = new AtomicInteger(0);
+
+        List<String> generatedPasswords = new ArrayList<>();
 
         disableInput();
 
@@ -237,10 +227,12 @@ public class Controller {
                     asciiValuesCopy.remove(index);
                 }
 
-            }while(isPasswordInvalid(password.toString(), useNumbers, useSymbols, useLowercase, useUppercase));
+            }while(Collections.synchronizedList(generatedPasswords).contains(password.toString()) ||
+                    isPasswordInvalid(password.toString(), useNumbers, useSymbols, useLowercase, useUppercase));
 
-            StringBuilder finalPassword = password;
-            Platform.runLater(() -> passwordListView.getItems().add(finalPassword.toString()));
+            String finalPassword = password.toString();
+            generatedPasswords.add(finalPassword);
+            Platform.runLater(() -> passwordListView.getItems().add(finalPassword));
 
             totalPasswords.getAndIncrement();
 
@@ -264,10 +256,11 @@ public class Controller {
 
     private boolean isInputInvalid() {
         return length == 0 || length < minLength || length > maxLength || numberOfPasswords == 0
-                || numberOfPasswords > 1000 || (!useNumbers && !useSymbols && !useLowercase && !useUppercase);
+                || numberOfPasswords > maxPasswordsCombos || (!useNumbers && !useSymbols && !useLowercase && !useUppercase);
     }
 
     private boolean isPasswordInvalid(String password, boolean numbers, boolean symbols, boolean lowercase, boolean uppercase) {
+
         boolean hasNumbers = false;
         boolean hasSymbols = false;
         boolean hasLowercase = false;
@@ -328,13 +321,13 @@ public class Controller {
     }
 
     private Integer[] getSelectedASCIIValues(boolean numbers, boolean symbols, boolean lowercase, boolean uppercase) {
-        final Integer[] NUMBERS = new Integer[]{ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57 };
+        final Integer[] NUMBERS = new Integer[]{ 48, 49, 50, 51, 52, 53, 54, 55, 56, 57 }; //10 numbers
         final Integer[] SYMBOLS = new Integer[]{ 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 58, 59, 61,
-                63, 64, 91, 92, 93, 94, 95, 96, 123, 124, 125, 126 };
+                63, 64, 91, 92, 93, 94, 95, 96, 123, 124, 125, 126 }; //30 symbols
         final Integer[] LOWERCASE = new Integer[]{ 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112,
-                113, 114, 115, 116, 117, 118, 119, 120, 121, 122 };
+                113, 114, 115, 116, 117, 118, 119, 120, 121, 122 }; //26 lowercase letters
         final Integer[] UPPERCASE = new Integer[]{ 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83,
-                84, 85, 86, 87, 88, 89, 90 };
+                84, 85, 86, 87, 88, 89, 90 }; //26 uppercase letters
 
         List<Integer> asciiValues = new ArrayList<>();
 
@@ -396,6 +389,19 @@ public class Controller {
         fadeInTimeline.play();
     }
 
+    private void updateValuesDriver(boolean useType, int length, boolean input) {
+        if(useType) {
+            minLength++;
+            maxLength += length;
+
+            maxCombosPerLetter += length;
+
+            if (input) {
+                colorValue -= 20;
+                strength += 20;
+            }
+        }
+    }
 
     private class CustomListCell extends ListCell<String> {
         @Override

@@ -5,7 +5,7 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<GridPane alignment="CENTER" hgap="10" prefHeight="493.0" prefWidth="684.0" vgap="10" xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="password.controller.Controller">
+<GridPane alignment="CENTER" hgap="10" prefHeight="493.0" prefWidth="684.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1" fx:controller="password.controller.Controller">
    <columnConstraints>
       <ColumnConstraints />
       <ColumnConstraints />
@@ -38,7 +38,7 @@
             <Font size="14.0" />
          </font>
       </Label>
-      <Label text="- 0 &lt; number of passwords &lt;= 1000">
+      <Label fx:id="passwordCountLabel" text="- 0 &lt; number of passwords &lt;= 1000">
          <font>
             <Font size="14.0" />
          </font>
