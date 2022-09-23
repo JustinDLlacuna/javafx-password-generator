@@ -5,7 +5,7 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
-<GridPane alignment="CENTER" hgap="10" prefHeight="493.0" prefWidth="684.0" vgap="10" xmlns="http://javafx.com/javafx/16" xmlns:fx="http://javafx.com/fxml/1" fx:controller="password.controller.Controller">
+<GridPane alignment="CENTER" hgap="10" prefHeight="493.0" prefWidth="684.0" vgap="10" xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1" fx:controller="password.controller.Controller">
    <columnConstraints>
       <ColumnConstraints />
       <ColumnConstraints />
@@ -76,7 +76,7 @@
          </HBox>
          <Button fx:id="generateButton" disable="true" mnemonicParsing="false" onAction="#generatePassword" text="Generate" />
          <ProgressBar fx:id="progressIndicator" maxWidth="1.7976931348623157E308" progress="0.0" visible="false" />
-         <Label text="v1.1.2" textFill="#00000080" />
+         <Label text="v1.1.3" textFill="#00000080" />
       </VBox>
    </VBox>
 </GridPane>
